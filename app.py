@@ -5,15 +5,16 @@ import pandas as pd
 import joblib
 
 from preprocessing import preprocess_data
-from randomforest import train_and_save_model
+from randomforest import train_and_save_model, load_and_predict_bulk
 from isolationforest import train_isolation_forest, detect_anomalies
+from combined_model import train_combined_model, evaluate_combined_model
 from autoencoder_backend import train_autoencoder, predict_autoencoder
 
 app = Flask(__name__)
 CORS(app)
 
+# Set up logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
-
 
 @app.route('/')
 def index():
@@ -64,35 +65,9 @@ def predict_rf_all():
     try:
         model_path = request.args.get('model', 'rf_model.pkl')
         logging.info(f"Loading Random Forest model from {model_path}")
-        model = joblib.load(model_path)
-
-        df = pd.read_csv('creditcard.csv')
-        if 'Class' not in df.columns:
-            raise ValueError("Missing 'Class' column in dataset.")
-
-        X = df.drop(columns=['Class'])
-        predictions = model.predict(X)
-
-        result_df = X.copy()
-        result_df['Prediction'] = predictions
-        result_df['Prediction_Label'] = result_df['Prediction'].map({0: 'Not Fraudulent', 1: 'Fraudulent'})
-        result_df['Actual'] = df['Class']
-        result_df['Actual_Label'] = result_df['Actual'].map({0: 'Not Fraudulent', 1: 'Fraudulent'})
-
-        fraud_count = sum(predictions)
-        total = len(predictions)
-        stats = {
-            'total': total,
-            'fraudulent': int(fraud_count),
-            'non_fraudulent': int(total - fraud_count),
-            'fraud_rate': round((fraud_count / total) * 100, 2)
-        }
-
+        result = load_and_predict_bulk(model_path=model_path)
         logging.debug("Random Forest predictions done.")
-        return jsonify({
-            'predictions': result_df.head(100).to_dict(orient='records'),
-            'stats': stats
-        })
+        return jsonify(result)
     except Exception as e:
         logging.exception("Error in /predict/randomforest/all")
         return jsonify({'error': str(e)}), 500
@@ -102,37 +77,43 @@ def predict_rf_all():
 def predict_iso_all():
     try:
         logging.info("Predicting with Isolation Forest...")
-        df = pd.read_csv('creditcard.csv')
-        if 'Class' not in df.columns:
-            raise ValueError("Missing 'Class' column in dataset.")
-
-        X = df.drop(columns=['Class'])
-        model = joblib.load('isolation_forest_model.pkl')
-        predictions = model.predict(X)
-
-        result_df = X.copy()
-        result_df['Anomaly'] = predictions
-        result_df['Anomaly_Label'] = result_df['Anomaly'].map({1: 'Normal', -1: 'Anomaly (Possible Fraud)'})
-        result_df['Actual'] = df['Class']
-        result_df['Actual_Label'] = result_df['Actual'].map({0: 'Not Fraudulent', 1: 'Fraudulent'})
-
-        anomaly_count = sum(predictions == -1)
-        total = len(predictions)
-        stats = {
-            'total': total,
-            'anomalies_detected': int(anomaly_count),
-            'normal': int(total - anomaly_count),
-            'anomaly_rate': round((anomaly_count / total) * 100, 2)
-        }
-
-        logging.debug("Isolation Forest predictions complete.")
-        return jsonify({
-            'predictions': result_df.head(100).to_dict(orient='records'),
-            'stats': stats
-        })
+        result = detect_anomalies()
+        logging.debug("Isolation Forest anomaly detection done.")
+        return jsonify(result)
     except Exception as e:
         logging.exception("Error in /predict/isolationforest/all")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/train/combined', methods=['POST'])
+def train_combined():
+    try:
+        data = request.get_json(force=True)
+        model_name = data.get('name', 'rf_model.pkl')
+
+        logging.info(f'[TRAIN COMBINED] Training started with parameters: {data}')
+        
+        result = train_combined_model(model_name)
+
+        logging.info(f'[TRAIN COMBINED] Training completed successfully: {result}')
+        return jsonify({'status': 'success', 'details': result}), 200
+    except Exception as e:
+        logging.error(f'[TRAIN COMBINED] Training failed: {e}', exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/evaluate/combined', methods=['GET'])
+def evaluate_combined():
+    try:
+        logging.info('[EVALUATE COMBINED] Evaluation started...')
+        
+        result = evaluate_combined_model()
+
+        logging.info(f'[EVALUATE COMBINED] Evaluation completed successfully: {result}')
+        return jsonify({'status': 'success', 'metrics': result}), 200
+    except Exception as e:
+        logging.error(f'[EVALUATE COMBINED] Evaluation failed: {e}', exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route("/train/autoencoder", methods=["POST"])
@@ -180,7 +161,3 @@ def predict_autoencoder_route():
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
-    stats = train_isolation_forest()
-    print("Isolation Forest Training Complete:")
-    for k, v in stats.items():
-        print(f"{k}: {v}")

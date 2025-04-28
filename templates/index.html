@@ -42,13 +42,16 @@
       </div>
     </section>
 
+    
     <section id="train" class="tab-content">
       <div class="card">
         <h2>Train Models</h2>
         <button onclick="trainRF()" class="btn">Random Forest</button>
         <button onclick="trainISO()" class="btn">Isolation Forest</button>
+        <button onclick="trainCombined()" class="btn">Combined Training</button>
         <pre id="trainRFResult" class="output-box"></pre>
         <pre id="trainISOResult" class="output-box"></pre>
+        <pre id="trainCombinedResult" class="output-box"></pre>
       </div>
       </section>
 
@@ -57,8 +60,10 @@
         <h2>Evaluate Models</h2>
         <button onclick="evaluateRF()" class="btn">Random Forest</button>
         <button onclick="evaluateISO()" class="btn">Isolation Forest</button>
+        <button onclick="evaluateCombined()" class="btn">Combined Evaluation</button>
         <pre id="rfEvalResult" class="output-box"></pre>
         <pre id="isoEvalResult" class="output-box"></pre>
+        <pre id="combinedEvalResult" class="output-box"></pre>
         <table id="model-eval-table">
           <thead id="model-eval-head"></thead>
           <tbody id="model-eval-body"></tbody>
