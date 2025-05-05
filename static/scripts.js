@@ -152,25 +152,30 @@ const trainRF = () => trainModel('/train/randomforest', 'rf_model', 'trainRFResu
 const trainISO = () => trainModel('/train/isolationforest', 'iso_model', 'trainISOResult');
 const trainCombined = () => trainModel('/train/combined', 'rf_model.pkl', 'trainCombinedResult');
 
-// ========== Evaluation Functions ==========
 async function evaluateModel(endpoint, resultId, modelName) {
   startLoading();
   try {
     const res = await fetch(endpoint);
     const data = await res.json();
-    const { predictions, stats } = data;
 
-    if (Array.isArray(predictions) && predictions.length) {
+    console.log(`${modelName} Evaluation Response:`, data);
+    const predictions = data.predictions;
+    const stats = data.stats;
+    if (predictions && Array.isArray(predictions) && predictions.length > 0) {
       renderModelTable(predictions, 'model-eval-head', 'model-eval-body');
       document.getElementById(resultId).textContent = `${modelName} evaluated on ${predictions.length} samples.`;
-      updateChartWithStats(stats);
+      updateChartWithStats(stats);  
     } else {
       document.getElementById(resultId).textContent = `No evaluation data available for ${modelName}.`;
       showToast(`No evaluation data for ${modelName}.`);
     }
-    console.log(`${modelName} Evaluation Stats:`, stats);
-  } catch (error) {
-    console.error(`Error evaluating ${modelName}:`, error);
+
+    if (stats) {
+      console.log(`${modelName} Stats:`, stats);
+    }
+
+  } catch (err) {
+    console.error(`Error evaluating ${modelName}:`, err);
     showToast(`Failed to evaluate ${modelName}.`);
   } finally {
     stopLoading();
